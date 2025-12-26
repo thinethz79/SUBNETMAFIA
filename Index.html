@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUBNET MAFIA // WAR_ROOM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-red: #ff003c;
+            --neon-yellow: #fcee0a;
+            --void-black: #020202;
+            --panel-bg: rgba(10, 5, 5, 0.75);
+            --border-color: rgba(255, 0, 60, 0.4);
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--void-black);
+            font-family: 'Rajdhani', sans-serif;
+            color: #e0e0e0;
+        }
+
+        /* --- 3D LAYER --- */
+        #world-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: 0;
+            filter: contrast(1.2) brightness(1.1);
+        }
+
+        /* --- UI OVERLAY --- */
+        #ui-layer {
+            position: relative;
+            z-index: 10;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            pointer-events: none;
+            background: radial-gradient(circle at center, transparent 0%, #000 120%); /* Vignette */
+        }
+
+        .hud-element { pointer-events: auto; }
+
+        /* --- AGGRESSIVE UI PANELS (SHARD STYLE) --- */
+        .cyber-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border-color);
+            /* Angled corners "Shard" look */
+            clip-path: polygon(
+                20px 0, 100% 0, 
+                100% calc(100% - 20px), calc(100% - 20px) 100%, 
+                0 100%, 0 20px
+            );
+            position: relative;
+            box-shadow: 0 0 20px rgba(255, 0, 60, 0.1);
+        }
+
+        .cyber-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-red), transparent);
+            animation: scanline 2s linear infinite;
+        }
+
+        @keyframes scanline { 0% { top: 0%; opacity: 0; } 50% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+
+        /* --- TYPOGRAPHY & GLOW --- */
+        .font-tech { font-family: 'Orbitron', sans-serif; }
+        .font-mono { font-family: 'Share Tech Mono', monospace; }
+        
+        .text-glow-red { text-shadow: 0 0 8px var(--neon-red); }
+        .text-glow-cyan { text-shadow: 0 0 8px var(--neon-cyan); }
+
+        /* --- GLITCH EFFECT --- */
+        .glitch-text { position: relative; display: inline-block; }
+        .glitch-text::before, .glitch-text::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: var(--void-black);
+        }
+        .glitch-text::before {
+            left: 2px; text-shadow: -1px 0 var(--neon-red);
+            clip: rect(24px, 550px, 90px, 0);
+            animation: glitch-anim-1 2.5s infinite linear alternate-reverse;
+        }
+        .glitch-text::after {
+            left: -2px; text-shadow: -1px 0 var(--neon-cyan);
+            clip: rect(85px, 550px, 140px, 0);
+            animation: glitch-anim-2 3s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim-1 {
+            0% { clip: rect(10px, 9999px, 30px, 0); }
+            20% { clip: rect(60px, 9999px, 80px, 0); }
+            40% { clip: rect(30px, 9999px, 50px, 0); }
+            60% { clip: rect(80px, 9999px, 100px, 0); }
+            80% { clip: rect(40px, 9999px, 60px, 0); }
+            100% { clip: rect(10px, 9999px, 30px, 0); }
+        }
+        @keyframes glitch-anim-2 {
+            0% { clip: rect(80px, 9999px, 100px, 0); }
+            20% { clip: rect(20px, 9999px, 40px, 0); }
+            40% { clip: rect(60px, 9999px, 80px, 0); }
+            60% { clip: rect(10px, 9999px, 30px, 0); }
+            80% { clip: rect(50px, 9999px, 70px, 0); }
+            100% { clip: rect(80px, 9999px, 100px, 0); }
+        }
+
+        /* --- NAVIGATION --- */
+        .cyber-btn {
+            background: rgba(255, 0, 60, 0.1);
+            border: 1px solid var(--neon-red);
+            color: var(--neon-red);
+            padding: 0.5rem 1.5rem;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+            text-transform: uppercase;
+        }
+        .cyber-btn:hover, .cyber-btn.active {
+            background: var(--neon-red);
+            color: black;
+            box-shadow: 0 0 20px var(--neon-red);
+            transform: translateX(5px);
+        }
+
+        /* --- LOADER --- */
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: black; z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column;
+        }
+        .scan-bar {
+            width: 300px; height: 4px; background: #333;
+            margin-top: 20px; position: relative; overflow: hidden;
+        }
+        .scan-bar::after {
+            content: ''; position: absolute; top: 0; left: 0; height: 100%; width: 0%;
+            background: var(--neon-red);
+            animation: loadProgress 2s ease-in-out forwards;
+        }
+        @keyframes loadProgress { to { width: 100%; } }
+
+        /* --- SCROLLBAR --- */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: var(--neon-red); }
+    </style>
+</head>
+<body>
+
+    <!-- 1. LOADER -->
+    <div id="loader">
+        <h1 class="text-4xl font-tech text-white tracking-widest glitch-text" data-text="INITIALIZING">INITIALIZING</h1>
+        <div class="scan-bar"></div>
+        <div class="text-xs text-red-500 font-mono mt-2">LOADING_WAR_MODULES...</div>
+        <button id="enter-btn" class="cyber-btn mt-8 opacity-0 pointer-events-none" onclick="enterWarRoom()">GRANT_ACCESS</button>
+    </div>
+
+    <!-- 2. 3D BACKGROUND -->
+    <canvas id="world-canvas"></canvas>
+
+    <!-- 3. HUD INTERFACE -->
+    <div id="ui-layer" class="p-4 md:p-8 opacity-0 transition-opacity duration-1000">
+        
+        <!-- TOP BAR -->
+        <header class="hud-element flex flex-wrap justify-between items-end border-b-2 border-red-900/50 pb-4 mb-8 bg-black/40 p-4 clip-path-header">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 border-2 border-red-500 flex items-center justify-center animate-pulse bg-red-900/20">
+                    <i class="fas fa-biohazard text-red-500 text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-4xl md:text-6xl font-tech font-black italic tracking-tighter text-white glitch-text" data-text="SUBNET MAFIA">
+                        SUBNET <span class="text-red-600">MAFIA</span>
+                    </h1>
+                    <div class="text-xs font-mono text-red-400 tracking-[0.3em]">OFFENSIVE_SECURITY_OPERATIONS</div>
+                </div>
+            </div>
+            
+            <div class="hidden md:block text-right">
+                <div class="flex items-center gap-2 justify-end text-red-500 font-bold mb-1">
+                    <div class="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+                    LIVE_FEED
+                </div>
+                <div class="text-3xl font-mono font-bold text-white" id="clock">00:00:00</div>
+            </div>
+        </header>
+
+        <!-- MAIN GRID -->
+        <div class="flex flex-col md:flex-row gap-6 h-full overflow-hidden">
+            
+            <!-- LEFT NAV -->
+            <nav class="hud-element w-full md:w-64 flex flex-row md:flex-col gap-4 z-50 overflow-x-auto md:overflow-visible pb-2">
+                <button class="cyber-btn active" onclick="switchTab('dashboard', this)">// OVERVIEW</button>
+                <button class="cyber-btn" onclick="switchTab('targets', this)">// TARGETS</button>
+                <button class="cyber-btn" onclick="switchTab('arsenal', this)">// ARSENAL</button>
+                <button class="cyber-btn" onclick="switchTab('comms', this)">// ENCRYPT_MSG</button>
+                
+                <!-- Status Box -->
+                <div class="mt-auto cyber-panel p-4 hidden md:block">
+                    <div class="text-xs text-gray-400 mb-2 font-mono">CONNECTION_STABILITY</div>
+                    <div class="w-full bg-gray-900 h-2 mb-1"><div class="bg-red-500 h-2 w-[85%] animate-pulse"></div></div>
+                    <div class="text-right text-xs text-red-500">85% UNSTABLE</div>
+                </div>
+            </nav>
+
+            <!-- CENTER CONTENT -->
+            <main class="hud-element flex-1 relative perspective-1000">
+                
+                <!-- DASHBOARD: WAR ROOM -->
+                <div id="panel-dashboard" class="cyber-panel p-6 w-full h-full md:max-w-4xl md:absolute top-0 left-0 transition-all duration-300">
+                    <div class="absolute top-0 right-0 p-2 bg-red-600 text-black font-bold text-xs">DEFCON 2</div>
+                    
+                    <h2 class="text-2xl font-tech text-white mb-6 border-l-4 border-red-500 pl-3">GLOBAL THREAT MAP</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-black/60 p-3 border border-red-900">
+                            <div class="text-xs text-gray-500 font-mono">ACTIVE_NODES</div>
+                            <div class="text-2xl text-red-500 font-bold">1,024</div>
+                        </div>
+                        <div class="bg-black/60 p-3 border border-red-900">
+                            <div class="text-xs text-gray-500 font-mono">EXPLOITS_DEPLOYED</div>
+                            <div class="text-2xl text-red-500 font-bold">8,992</div>
+                        </div>
+                        <div class="bg-black/60 p-3 border border-red-900">
+                            <div class="text-xs text-gray-500 font-mono">SUCCESS_RATE</div>
+                            <div class="text-2xl text-cyan-400 font-bold">99.9%</div>
+                        </div>
+                    </div>
+
+                    <!-- Fake Terminal Feed -->
+                    <div class="bg-black border border-gray-800 p-4 font-mono text-xs h-48 md:h-64 overflow-hidden relative">
+                        <div class="absolute top-0 right-0 text-gray-600 p-1">./scout.sh</div>
+                        <div id="terminal-feed" class="text-green-500 space-y-1">
+                            <!-- JS populates this -->
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex gap-4">
+                        <button class="border border-red-500 text-red-500 px-4 py-2 hover:bg-red-500 hover:text-black font-bold text-sm transition-colors w-full" onclick="playSfx('warning')">
+                            <i class="fas fa-skull mr-2"></i> INITIATE RED TEAM
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TARGETS LIST -->
+                <div id="panel-targets" class="cyber-panel p-6 w-full h-full md:max-w-4xl md:absolute top-0 left-0 opacity-0 pointer-events-none scale-95 transition-all duration-300">
+                    <h2 class="text-2xl font-tech text-white mb-6 border-l-4 border-yellow-500 pl-3">PRIORITY TARGETS</h2>
+                    <div class="space-y-3 overflow-y-auto h-[60vh] pr-2 custom-scroll">
+                        <!-- Target Item -->
+                        <div class="flex items-center justify-between bg-black/40 p-3 border-l-2 border-red-500 hover:bg-red-900/20 cursor-pointer group transition-all" onclick="playSfx('click')">
+                            <div>
+                                <div class="font-bold text-white group-hover:text-red-400">CORP_GRID_ALPHA</div>
+                                <div class="text-xs text-gray-500 font-mono">IP: 192.168.X.X // FIREWALL: HARDENED</div>
+                            </div>
+                            <div class="text-xs bg-red-900 text-red-200 px-2 py-1">BOUNTY: $50K</div>
+                        </div>
+                         <!-- Target Item -->
+                         <div class="flex items-center justify-between bg-black/40 p-3 border-l-2 border-yellow-500 hover:bg-yellow-900/20 cursor-pointer group transition-all" onclick="playSfx('click')">
+                            <div>
+                                <div class="font-bold text-white group-hover:text-yellow-400">SAT_UPLINK_04</div>
+                                <div class="text-xs text-gray-500 font-mono">ORBIT: GEO-SYNC // ENCRYPTION: WEAK</div>
+                            </div>
+                            <div class="text-xs bg-yellow-900 text-yellow-200 px-2 py-1">BOUNTY: $15K</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ARSENAL (Agents) -->
+                <div id="panel-arsenal" class="cyber-panel p-6 w-full h-full md:max-w-4xl md:absolute top-0 left-0 opacity-0 pointer-events-none scale-95 transition-all duration-300">
+                    <h2 class="text-2xl font-tech text-white mb-6 border-l-4 border-cyan-500 pl-3">OPERATIVE ROSTER</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="bg-black/50 border border-gray-700 p-4 hover:border-cyan-400 transition-colors group relative overflow-hidden">
+                            <div class="absolute -right-4 -top-4 text-6xl text-gray-800 opacity-20"><i class="fas fa-chess-king"></i></div>
+                            <h3 class="text-xl font-bold text-cyan-400 group-hover:text-white">0xZERO</h3>
+                            <p class="text-xs text-gray-400 mb-2">RANK: OVERLORD</p>
+                            <div class="flex gap-1 mt-2">
+                                <span class="bg-gray-800 text-[10px] px-1 text-gray-300">NETSEC</span>
+                                <span class="bg-gray-800 text-[10px] px-1 text-gray-300">STRATEGY</span>
+                            </div>
+                        </div>
+                         <div class="bg-black/50 border border-gray-700 p-4 hover:border-cyan-400 transition-colors group relative overflow-hidden">
+                            <div class="absolute -right-4 -top-4 text-6xl text-gray-800 opacity-20"><i class="fas fa-ghost"></i></div>
+                            <h3 class="text-xl font-bold text-cyan-400 group-hover:text-white">PHANTOM</h3>
+                            <p class="text-xs text-gray-400 mb-2">RANK: GHOST_OP</p>
+                             <div class="flex gap-1 mt-2">
+                                <span class="bg-gray-800 text-[10px] px-1 text-gray-300">OSINT</span>
+                                <span class="bg-gray-800 text-[10px] px-1 text-gray-300">SOCIAL_ENG</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COMMS -->
+                <div id="panel-comms" class="cyber-panel p-6 w-full h-full md:max-w-4xl md:absolute top-0 left-0 opacity-0 pointer-events-none scale-95 transition-all duration-300">
+                    <h2 class="text-2xl font-tech text-white mb-6 border-l-4 border-green-500 pl-3">ENCRYPTED CHANNEL</h2>
+                    <div class="space-y-6">
+                        <div class="relative">
+                            <label class="text-xs text-green-500 font-mono mb-1 block">DESTINATION_KEY</label>
+                            <input type="text" class="w-full bg-black/50 border-b border-green-500 text-white p-2 focus:outline-none focus:bg-green-900/10 font-mono" placeholder="0x...">
+                        </div>
+                        <div class="relative">
+                            <label class="text-xs text-green-500 font-mono mb-1 block">PAYLOAD</label>
+                            <textarea rows="5" class="w-full bg-black/50 border-b border-green-500 text-white p-2 focus:outline-none focus:bg-green-900/10 font-mono" placeholder="Enter message data..."></textarea>
+                        </div>
+                        <button class="w-full bg-green-900/20 border border-green-500 text-green-400 py-3 font-bold hover:bg-green-500 hover:text-black transition-all clip-path-btn" onclick="playSfx('success'); alert('PACKET INJECTED INTO NETWORK.')">
+                            EXECUTE UPLOAD
+                        </button>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. AUDIO SYSTEM ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let isAudioInit = false;
+
+        const sfx = {
+            click: () => playTone(800, 'square', 0.03),
+            hover: () => playTone(200, 'sawtooth', 0.01),
+            warning: () => {
+                playTone(150, 'sawtooth', 0.1);
+                setTimeout(() => playTone(100, 'sawtooth', 0.3), 100);
+            },
+            success: () => {
+                playTone(600, 'sine', 0.1);
+                setTimeout(() => playTone(1200, 'sine', 0.2), 100);
+            },
+            boot: () => {
+                // Aggressive bass sweep
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(50, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(150, audioCtx.currentTime + 0.5);
+                
+                // Distortion
+                const dist = audioCtx.createWaveShaper();
+                dist.curve = makeDistortionCurve(400);
+                
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.0);
+                
+                osc.connect(dist);
+                dist.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 1.0);
+            }
+        };
+
+        function makeDistortionCurve(amount) {
+            let k = typeof amount === 'number' ? amount : 50,
+                n_samples = 44100,
+                curve = new Float32Array(n_samples),
+                deg = Math.PI / 180,
+                i = 0, x;
+            for ( ; i < n_samples; ++i ) {
+                x = i * 2 / n_samples - 1;
+                curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
+            }
+            return curve;
+        }
+
+        function playTone(freq, type, duration) {
+            if (!isAudioInit) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+ 
